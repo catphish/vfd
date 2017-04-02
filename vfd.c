@@ -62,7 +62,8 @@ ISR(TIMER1_COMPA_vect)
 
 // PCINT0 handles the rotary encoder
 // Turninng the rotary encoder changes the delay between each sine wave increment
-ISR(PCINT0_vect) {
+ISR(PCINT0_vect)
+{
   unsigned char new_portb;
   new_portb = PINB;
 
@@ -113,7 +114,7 @@ ISR(PCINT0_vect) {
   if(delay > 62496) delay = 62496;
 }
 
-int main (void)
+int main()
 {
   // Initialize variables
   sine_position = 0;
