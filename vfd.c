@@ -1,4 +1,5 @@
 #include <avr/interrupt.h>
+#include <util/delay.h>
 #include "uart.h"
 #include "sine.h"
 
@@ -13,8 +14,8 @@ unsigned char direction;
 void update_sine()
 {
   double voltage;
-  // 45v at 20Hz, this seems the most efficient for my no-load testing
-  voltage = (double)3125 / (double)delay;
+  // 45v at 7Hz
+  voltage = (double)8928 / (double)delay;
   // We could alter the curve
   // voltage = 0.2 + 0.8 * voltage;
 
@@ -108,8 +109,8 @@ ISR(PCINT0_vect)
     }
   }
   old_portb = new_portb;
-  // Don't go faster than 20Hz
-  if(delay < 3125) delay = 3125;
+  // Don't go faster than 50Hz
+  if(delay < 1250) delay = 1250;
   // Don't go slower than 1Hz
   if(delay > 62496) delay = 62496;
 }
@@ -147,7 +148,7 @@ int main()
   TCNT1 = 0;                       // Zero the timer
   TIMSK1 |= (1 << OCIE1A);         // Enable match interrupt
   OCR1A = 62496;                   // 62496 = 1Hz, this line mostly for reference
-  delay = 3125;                    // Start at at 20Hz
+  delay = 8928;                    // Start at at 7Hz
 
   // Configure pin change interrupt on PCINT0
   DDRB = 0;      // Input
