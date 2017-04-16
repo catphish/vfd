@@ -4,6 +4,8 @@
 #include "sine.h"
 
 #define DIALINC 3                        // Set the increment for the control dial
+#define SLA_W 128
+#define SLA_R 129
 
 unsigned char sine_position;
 unsigned short delay;
@@ -16,6 +18,7 @@ void update_sine()
   double voltage;
   // 45v at 7Hz
   voltage = (double)8928 / (double)delay;
+
   // We could alter the curve
   // voltage = 0.2 + 0.8 * voltage;
 
@@ -147,7 +150,7 @@ int main()
   TCCR1B = (1<<CS10) | (1<<WGM12); // Prescale (/1), CTC mode
   TCNT1 = 0;                       // Zero the timer
   TIMSK1 |= (1 << OCIE1A);         // Enable match interrupt
-  OCR1A = 62496;                   // 62496 = 1Hz, this line mostly for reference
+  OCR1A = 8928;                    // 62496 = 1Hz
   delay = 8928;                    // Start at at 7Hz
 
   // Configure pin change interrupt on PCINT0
@@ -163,6 +166,7 @@ int main()
   sei();
 
   while(1) {
+
   }
 
 }
