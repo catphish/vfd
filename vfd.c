@@ -24,27 +24,27 @@ void update_sine()
 
   // We have a table for each motor direction
   if(direction) {
-    OCR3B = (sine_ocr3b[sine_position] * voltage) << 8;
-    OCR3C = (sine_ocr3c[sine_position] * voltage) << 8;
+    OCR3B = (sine_ocr3b[sine_position] * voltage) >> 8;
+    OCR3C = (sine_ocr3c[sine_position] * voltage) >> 8;
 
-    OCR3A = (sine_ocr3a[sine_position] * voltage) << 8;
-    OCR4A = (sine_ocr4a[sine_position] * voltage) << 8;
+    OCR3A = (sine_ocr3a[sine_position] * voltage) >> 8;
+    OCR4A = (sine_ocr4a[sine_position] * voltage) >> 8;
 
-    OCR4B = (sine_ocr4b[sine_position] * voltage) << 8;
-    OCR4C = (sine_ocr4c[sine_position] * voltage) << 8;
+    OCR4B = (sine_ocr4b[sine_position] * voltage) >> 8;
+    OCR4C = (sine_ocr4c[sine_position] * voltage) >> 8;
 
     // These final tables switch on either the positive or negative PWM pins.
     TCCR3A = sine_tccr3a[sine_position] | _BV(WGM31);
     TCCR4A = sine_tccr4a[sine_position] | _BV(WGM41);
   } else {
-    OCR3B = (sine_ocr3b_r[sine_position] * voltage) << 8;
-    OCR3C = (sine_ocr3c_r[sine_position] * voltage) << 8;
+    OCR3B = (sine_ocr3b_r[sine_position] * voltage) >> 8;
+    OCR3C = (sine_ocr3c_r[sine_position] * voltage) >> 8;
 
-    OCR3A = (sine_ocr3a_r[sine_position] * voltage) << 8;
-    OCR4A = (sine_ocr4a_r[sine_position] * voltage) << 8;
+    OCR3A = (sine_ocr3a_r[sine_position] * voltage) >> 8;
+    OCR4A = (sine_ocr4a_r[sine_position] * voltage) >> 8;
 
-    OCR4B = (sine_ocr4b_r[sine_position] * voltage) << 8;
-    OCR4C = (sine_ocr4c_r[sine_position] * voltage) << 8;
+    OCR4B = (sine_ocr4b_r[sine_position] * voltage) >> 8;
+    OCR4C = (sine_ocr4c_r[sine_position] * voltage) >> 8;
 
     // These final tables switch on either the positive or negative PWM pins.
     TCCR3A = sine_tccr3a_r[sine_position] | _BV(WGM31);
