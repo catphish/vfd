@@ -8,43 +8,43 @@
 #define SLA_R 129
 
 unsigned char sine_position;
-unsigned short delay;
+uint16_t delay;
 unsigned char old_portb;
 unsigned char direction;
 
 // This method writes data from sine tables to the PWMs
 void update_sine()
 {
-  // 45v at 7Hz
-  unsigned int voltage;
-  voltage = ((unsigned int)8928 * 256) / delay;
+  // 45v at 7Hz - (62496 / 7) * 256
+  uint32_t voltage;
+  voltage = 2285568 / delay;
 
   // Limit to bus voltage
   if(voltage > 255) voltage = 255;
 
   // We have a table for each motor direction
   if(direction) {
-    OCR3B = (sine_ocr3b[sine_position] * voltage) >> 8;
-    OCR3C = (sine_ocr3c[sine_position] * voltage) >> 8;
+    OCR3B = (voltage * sine_ocr3b[sine_position]) >> 8;
+    OCR3C = (voltage * sine_ocr3c[sine_position]) >> 8;
 
-    OCR3A = (sine_ocr3a[sine_position] * voltage) >> 8;
-    OCR4A = (sine_ocr4a[sine_position] * voltage) >> 8;
+    OCR3A = (voltage * sine_ocr3a[sine_position]) >> 8;
+    OCR4A = (voltage * sine_ocr4a[sine_position]) >> 8;
 
-    OCR4B = (sine_ocr4b[sine_position] * voltage) >> 8;
-    OCR4C = (sine_ocr4c[sine_position] * voltage) >> 8;
+    OCR4B = (voltage * sine_ocr4b[sine_position]) >> 8;
+    OCR4C = (voltage * sine_ocr4c[sine_position]) >> 8;
 
     // These final tables switch on either the positive or negative PWM pins.
     TCCR3A = sine_tccr3a[sine_position] | _BV(WGM31);
     TCCR4A = sine_tccr4a[sine_position] | _BV(WGM41);
   } else {
-    OCR3B = (sine_ocr3b_r[sine_position] * voltage) >> 8;
-    OCR3C = (sine_ocr3c_r[sine_position] * voltage) >> 8;
+    OCR3B = (voltage * sine_ocr3b_r[sine_position]) >> 8;
+    OCR3C = (voltage * sine_ocr3c_r[sine_position]) >> 8;
 
-    OCR3A = (sine_ocr3a_r[sine_position] * voltage) >> 8;
-    OCR4A = (sine_ocr4a_r[sine_position] * voltage) >> 8;
+    OCR3A = (voltage * sine_ocr3a_r[sine_position]) >> 8;
+    OCR4A = (voltage * sine_ocr4a_r[sine_position]) >> 8;
 
-    OCR4B = (sine_ocr4b_r[sine_position] * voltage) >> 8;
-    OCR4C = (sine_ocr4c_r[sine_position] * voltage) >> 8;
+    OCR4B = (voltage * sine_ocr4b_r[sine_position]) >> 8;
+    OCR4C = (voltage * sine_ocr4c_r[sine_position]) >> 8;
 
     // These final tables switch on either the positive or negative PWM pins.
     TCCR3A = sine_tccr3a_r[sine_position] | _BV(WGM31);
