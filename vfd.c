@@ -3,12 +3,10 @@
 #include "uart.h"
 #include "sine.h"
 
-#define DIALINC 3                        // Set the increment for the control dial
-#define SLA_W 128
-#define SLA_R 129
+#define DIALINC 100 // Set the increment for the control dial
 
-unsigned char sine_position;
-uint16_t delay;
+uint32_t sine_position;
+int32_t rate;
 unsigned char old_portb;
 unsigned char direction;
 
@@ -17,52 +15,37 @@ void update_sine()
 {
   // 45v at 7Hz - (62496 / 7) * 256
   uint32_t voltage;
-  voltage = 2285568 / delay;
+  uint32_t sine_position_msb;
+  sine_position_msb = (sine_position >> 24);
+  //voltage = 2285568 / delay;
 
   // Limit to bus voltage
-  if(voltage > 255) voltage = 255;
+  //if(voltage > 255) voltage = 255;
+  voltage = 256;
 
-  // We have a table for each motor direction
-  if(direction) {
-    OCR3B = (voltage * sine_ocr3b[sine_position]) >> 8;
-    OCR3C = (voltage * sine_ocr3c[sine_position]) >> 8;
+  OCR3B = (voltage * sine_ocr3b[sine_position_msb]) >> 8;
+  OCR3C = (voltage * sine_ocr3c[sine_position_msb]) >> 8;
 
-    OCR3A = (voltage * sine_ocr3a[sine_position]) >> 8;
-    OCR4A = (voltage * sine_ocr4a[sine_position]) >> 8;
+  OCR3A = (voltage * sine_ocr3a[sine_position_msb]) >> 8;
+  OCR4A = (voltage * sine_ocr4a[sine_position_msb]) >> 8;
 
-    OCR4B = (voltage * sine_ocr4b[sine_position]) >> 8;
-    OCR4C = (voltage * sine_ocr4c[sine_position]) >> 8;
+  OCR4B = (voltage * sine_ocr4b[sine_position_msb]) >> 8;
+  OCR4C = (voltage * sine_ocr4c[sine_position_msb]) >> 8;
 
-    // These final tables switch on either the positive or negative PWM pins.
-    TCCR3A = sine_tccr3a[sine_position] | _BV(WGM31);
-    TCCR4A = sine_tccr4a[sine_position] | _BV(WGM41);
-  } else {
-    OCR3B = (voltage * sine_ocr3b_r[sine_position]) >> 8;
-    OCR3C = (voltage * sine_ocr3c_r[sine_position]) >> 8;
-
-    OCR3A = (voltage * sine_ocr3a_r[sine_position]) >> 8;
-    OCR4A = (voltage * sine_ocr4a_r[sine_position]) >> 8;
-
-    OCR4B = (voltage * sine_ocr4b_r[sine_position]) >> 8;
-    OCR4C = (voltage * sine_ocr4c_r[sine_position]) >> 8;
-
-    // These final tables switch on either the positive or negative PWM pins.
-    TCCR3A = sine_tccr3a_r[sine_position] | _BV(WGM31);
-    TCCR4A = sine_tccr4a_r[sine_position] | _BV(WGM41);
-  }
+  // These final tables switch on either the positive or negative PWM pins.
+  TCCR3A = sine_tccr3a[sine_position_msb] | _BV(WGM31);
+  TCCR4A = sine_tccr4a[sine_position_msb] | _BV(WGM41);
 }
 
 // Timer 1 advances the sine wave
 ISR(TIMER1_COMPA_vect)
 {
-  sine_position++;
+  sine_position += rate;
   update_sine();
-  OCR1A = delay;
-
 }
 
 // PCINT0 handles the rotary encoder
-// Turninng the rotary encoder changes the delay between each sine wave increment
+// Turninng the rotary encoder changes the rate of sine wave increment
 ISR(PCINT0_vect)
 {
   unsigned char new_portb;
@@ -72,54 +55,54 @@ ISR(PCINT0_vect)
     // B0 went high
     if(new_portb & 2) {
       // B1 is high, CCW
-      delay-=DIALINC;
+      rate+=DIALINC;
     } else {
       // B1 is low, CW
-      delay+=DIALINC;
+      rate-=DIALINC;
     }
   }
   if (!(new_portb & 1) && (old_portb & 1)) {
     // B0 went low
     if(new_portb & 2) {
       // B1 is high, CW
-      delay+=DIALINC;
+      rate-=DIALINC;
     } else {
       // B1 is low, CCW
-      delay-=DIALINC;
+      rate+=DIALINC;
     }
   }
   if ((new_portb & 2) && !(old_portb & 2)) {
     // B1 went high
     if(new_portb & 1) {
       // B0 is high, CW
-      delay+=DIALINC;
+      rate-=DIALINC;
     } else {
       // B0 is low, CCW
-      delay-=DIALINC;
+      rate+=DIALINC;
     }
   }
   if (!(new_portb & 2) && (old_portb & 2)) {
     // B1 went low
     if(new_portb & 1) {
       // B0 is high, CCW
-      delay-=DIALINC;
+      rate+=DIALINC;
     } else {
       // B0 is low, CW
-      delay+=DIALINC;
+      rate-=DIALINC;
     }
   }
   old_portb = new_portb;
-  // Don't go faster than 50Hz
-  if(delay < 1250) delay = 1250;
+
   // Don't go slower than 1Hz
-  if(delay > 62496) delay = 62496;
+  if(rate < 268435)   rate = 268435;
+  // Don't go faster than 100Hz
+  if(rate > 26843546) rate = 26843546;
 }
 
 int main()
 {
   // Initialize variables
   sine_position = 0;
-  direction = 1;
   old_portb = PINB;
 
   // set pins for output
@@ -147,8 +130,8 @@ int main()
   TCCR1B = (1<<CS10) | (1<<WGM12); // Prescale (/1), CTC mode
   TCNT1 = 0;                       // Zero the timer
   TIMSK1 |= (1 << OCIE1A);         // Enable match interrupt
-  OCR1A = 8928;                    // 62496 = 1Hz
-  delay = 8928;                    // Start at at 7Hz
+  OCR1A = 1000;                    // 16,000 Hz
+  rate = 2684355;                  // 10Hz
 
   // Configure pin change interrupt on PCINT0
   DDRB = 0;      // Input
