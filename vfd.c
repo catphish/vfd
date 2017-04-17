@@ -3,7 +3,7 @@
 #include "uart.h"
 #include "sine.h"
 
-#define DIALINC 100 // Set the increment for the control dial
+#define DIALINC 1 // Set the increment for the control dial
 
 uint32_t sine_position;
 int32_t rate;
@@ -13,15 +13,15 @@ unsigned char direction;
 // This method writes data from sine tables to the PWMs
 void update_sine()
 {
-  // 45v at 7Hz - (62496 / 7) * 256
   uint32_t voltage;
   uint32_t sine_position_msb;
-  sine_position_msb = (sine_position >> 24);
-  //voltage = 2285568 / delay;
+  sine_position_msb = ((sine_position & 0xFF0000) >> 16);
+
+  // This is an approximation of 45v at 7Hz
+  voltage = (rate * 9) >> 8;
 
   // Limit to bus voltage
-  //if(voltage > 255) voltage = 255;
-  voltage = 256;
+  if(voltage > 256) voltage = 256;
 
   OCR3B = (voltage * sine_ocr3b[sine_position_msb]) >> 8;
   OCR3C = (voltage * sine_ocr3c[sine_position_msb]) >> 8;
@@ -94,9 +94,9 @@ ISR(PCINT0_vect)
   old_portb = new_portb;
 
   // Don't go slower than 1Hz
-  if(rate < 268435)   rate = 268435;
+  if(rate < 1048)   rate = 1048;
   // Don't go faster than 100Hz
-  if(rate > 26843546) rate = 26843546;
+  if(rate > 104857) rate = 104857;
 }
 
 int main()
@@ -131,7 +131,7 @@ int main()
   TCNT1 = 0;                       // Zero the timer
   TIMSK1 |= (1 << OCIE1A);         // Enable match interrupt
   OCR1A = 1000;                    // 16,000 Hz
-  rate = 2684355;                  // 10Hz
+  rate = 10485;                    // 1Hz = 1048.576
 
   // Configure pin change interrupt on PCINT0
   DDRB = 0;      // Input
