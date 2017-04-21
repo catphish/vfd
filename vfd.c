@@ -18,10 +18,11 @@ void update_sine()
   sine_position_msb = ((sine_position & 0xFF0000) >> 16);
 
   // This is an approximation of 45v at 7Hz
-  voltage = (rate * 9) >> 8;
+  //voltage = (rate * 9) >> 8;
 
   // Limit to bus voltage
-  if(voltage > 256) voltage = 256;
+  //if(voltage > 256) voltage = 256;
+  voltage = 256;
 
   OCR3B = (voltage * sine_ocr3b[sine_position_msb]) >> 8;
   OCR3C = (voltage * sine_ocr3c[sine_position_msb]) >> 8;
@@ -142,11 +143,25 @@ int main()
   // Initialize serial output
   uart_init();
 
+  ADMUX = (1<<REFS0);
+  ADCSRA = (1<<ADEN)|(1<<ADPS2)|(1<<ADPS1)|(1<<ADPS0);
+
   // Enable interrupts globally
   sei();
 
+  uint16_t n;
+  uint32_t t;
   while(1) {
-
+    t = 0;
+    for(n=0;n<256;n++) {
+      ADCSRA |= (1<<ADSC);
+      while(ADCSRA & (1<<ADSC));
+      t = t + ADC;
+      }
+    uart_write_uint32_t(t);
+    uart_write_byte(',');
+    uart_write_uint32_t(rate);
+    uart_write_nl();
   }
 
 }

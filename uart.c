@@ -25,15 +25,15 @@ void uart_sendstring(char* str)
   }
 }
 
-void uart_write_int(unsigned int i) {
+void uart_write_int32_t(int32_t i) {
   char buffer[20];
-  itoa(i, buffer, 10);
+  ltoa(i, buffer, 10);
   uart_sendstring(buffer);
 }
 
-void uart_write_uint(unsigned int i) {
+void uart_write_uint32_t(uint32_t i) {
   char buffer[20];
-  utoa(i, buffer, 10);
+  ultoa(i, buffer, 10);
   uart_sendstring(buffer);
 }
 
