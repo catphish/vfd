@@ -1,5 +1,6 @@
 #include <avr/interrupt.h>
 #include <util/delay.h>
+#include <stdlib.h>
 #include "uart.h"
 #include "sine.h"
 
@@ -17,21 +18,21 @@ void update_sine()
   uint32_t sine_position_msb;
   sine_position_msb = ((sine_position & 0xFF0000) >> 16);
 
-  // This is an approximation of 45v at 7Hz
-  //voltage = (rate * 9) >> 8;
+  // This is an approximation of line voltage (45v) at 10.4Hz
+  voltage = (labs(rate) * 6);
 
   // Limit to bus voltage
-  //if(voltage > 256) voltage = 256;
-  voltage = 256;
+  if(voltage > 65536) voltage = 65536;
 
-  OCR3B = (voltage * sine_ocr3b[sine_position_msb]) >> 8;
-  OCR3C = (voltage * sine_ocr3c[sine_position_msb]) >> 8;
+  // Lookup positions in sine table, multiply by voltage, and sent to PWM
+  OCR3B = (voltage * sine_ocr3b[sine_position_msb]) >> 16;
+  OCR3C = (voltage * sine_ocr3c[sine_position_msb]) >> 16;
 
-  OCR3A = (voltage * sine_ocr3a[sine_position_msb]) >> 8;
-  OCR4A = (voltage * sine_ocr4a[sine_position_msb]) >> 8;
+  OCR3A = (voltage * sine_ocr3a[sine_position_msb]) >> 16;
+  OCR4A = (voltage * sine_ocr4a[sine_position_msb]) >> 16;
 
-  OCR4B = (voltage * sine_ocr4b[sine_position_msb]) >> 8;
-  OCR4C = (voltage * sine_ocr4c[sine_position_msb]) >> 8;
+  OCR4B = (voltage * sine_ocr4b[sine_position_msb]) >> 16;
+  OCR4C = (voltage * sine_ocr4c[sine_position_msb]) >> 16;
 
   // These final tables switch on either the positive or negative PWM pins.
   TCCR3A = sine_tccr3a[sine_position_msb] | _BV(WGM31);
@@ -94,10 +95,12 @@ ISR(PCINT0_vect)
   }
   old_portb = new_portb;
 
-  // Don't go slower than 1Hz
-  if(rate < 1048)   rate = 1048;
+  // Don't go slower than -10Hz
+  if(rate < -10486) rate = -10486;
+  // Don't go faster than 10Hz
+  if(rate > 10486)  rate = 10486;
   // Don't go faster than 100Hz
-  if(rate > 104857) rate = 104857;
+  //if(rate > 104857) rate = 104857;
 }
 
 int main()
@@ -150,17 +153,17 @@ int main()
   sei();
 
   uint16_t n;
-  uint32_t t;
+  int32_t t;
   while(1) {
     t = 0;
     for(n=0;n<256;n++) {
       ADCSRA |= (1<<ADSC);
       while(ADCSRA & (1<<ADSC));
       t = t + ADC;
-      }
-    uart_write_uint32_t(t);
+    }
+    uart_write_int32_t(t - 131478);
     uart_write_byte(',');
-    uart_write_uint32_t(rate);
+    uart_write_int32_t(rate);
     uart_write_nl();
   }
 
