@@ -4,22 +4,25 @@
 #include "uart.h"
 #include "sine.h"
 
-#define DIALINC 1 // Set the increment for the control dial
-
 uint32_t sine_position;
-int32_t rate;
-unsigned char old_portb;
-unsigned char direction;
+uint32_t sine_position_msb;
+uint32_t voltage;
+
+// PCINT0 handles the rotary encoder
+// Turninng the rotary encoder changes the rate of sine wave increment
+ISR(PCINT0_vect)
+{
+  //sine_position += 13981; // 13981 = synchronous speed
+  sine_position += 20971; // 150%
+}
 
 // This method writes data from sine tables to the PWMs
 void update_sine()
 {
-  uint32_t voltage;
-  uint32_t sine_position_msb;
   sine_position_msb = ((sine_position & 0xFF0000) >> 16);
 
-  // This is an approximation of line voltage (45v) at 10.4Hz
-  voltage = (labs(rate) * 6);
+  // This is an approximation of line voltage ???
+  //voltage = (labs(rate) * 2);
 
   // Limit to bus voltage
   if(voltage > 65536) voltage = 65536;
@@ -39,75 +42,14 @@ void update_sine()
   TCCR4A = sine_tccr4a[sine_position_msb] | _BV(WGM41);
 }
 
-// Timer 1 advances the sine wave
-ISR(TIMER1_COMPA_vect)
-{
-  sine_position += rate;
-  update_sine();
-}
-
-// PCINT0 handles the rotary encoder
-// Turninng the rotary encoder changes the rate of sine wave increment
-ISR(PCINT0_vect)
-{
-  unsigned char new_portb;
-  new_portb = PINB;
-
-  if ((new_portb & 1) && !(old_portb & 1)) {
-    // B0 went high
-    if(new_portb & 2) {
-      // B1 is high, CCW
-      rate+=DIALINC;
-    } else {
-      // B1 is low, CW
-      rate-=DIALINC;
-    }
-  }
-  if (!(new_portb & 1) && (old_portb & 1)) {
-    // B0 went low
-    if(new_portb & 2) {
-      // B1 is high, CW
-      rate-=DIALINC;
-    } else {
-      // B1 is low, CCW
-      rate+=DIALINC;
-    }
-  }
-  if ((new_portb & 2) && !(old_portb & 2)) {
-    // B1 went high
-    if(new_portb & 1) {
-      // B0 is high, CW
-      rate-=DIALINC;
-    } else {
-      // B0 is low, CCW
-      rate+=DIALINC;
-    }
-  }
-  if (!(new_portb & 2) && (old_portb & 2)) {
-    // B1 went low
-    if(new_portb & 1) {
-      // B0 is high, CCW
-      rate+=DIALINC;
-    } else {
-      // B0 is low, CW
-      rate-=DIALINC;
-    }
-  }
-  old_portb = new_portb;
-
-  // Don't go slower than -10Hz
-  if(rate < -10486) rate = -10486;
-  // Don't go faster than 10Hz
-  if(rate > 10486)  rate = 10486;
-  // Don't go faster than 100Hz
-  //if(rate > 104857) rate = 104857;
-}
-
 int main()
 {
   // Initialize variables
   sine_position = 0;
-  old_portb = PINB;
+
+  // Set port F as input
+  DDRF = 0;
+  PORTF = 0;
 
   // set pins for output
   DDRE |= _BV(DDE4); // 2
@@ -129,13 +71,12 @@ int main()
   TCCR4B = _BV(WGM42) | _BV(WGM43) | _BV(CS40);  // Port 6,7,8
   ICR4 = 0x3FF;
 
-  // Configure timer 1, this will increment sine wave
-  TCCR1A = 0;
-  TCCR1B = (1<<CS10) | (1<<WGM12); // Prescale (/1), CTC mode
-  TCNT1 = 0;                       // Zero the timer
-  TIMSK1 |= (1 << OCIE1A);         // Enable match interrupt
-  OCR1A = 1000;                    // 16,000 Hz
-  rate = 10485;                    // 1Hz = 1048.576
+  // Initialize serial output
+  uart_init();
+
+  // Initialize ADC
+  ADMUX = (1<<REFS0);
+  ADCSRA = (1<<ADEN)|(1<<ADPS1);
 
   // Configure pin change interrupt on PCINT0
   DDRB = 0;      // Input
@@ -143,28 +84,23 @@ int main()
   PCMSK0 = 3;    // Trigger on pins 0 and 1
   PCICR = 1;     // Enable PCIE0
 
-  // Initialize serial output
-  uart_init();
-
-  ADMUX = (1<<REFS0);
-  ADCSRA = (1<<ADEN)|(1<<ADPS2)|(1<<ADPS1)|(1<<ADPS0);
-
   // Enable interrupts globally
   sei();
 
   uint16_t n;
-  int32_t t;
   while(1) {
-    t = 0;
-    for(n=0;n<256;n++) {
-      ADCSRA |= (1<<ADSC);
-      while(ADCSRA & (1<<ADSC));
-      t = t + ADC;
-    }
-    uart_write_int32_t(t - 131478);
-    uart_write_byte(',');
-    uart_write_int32_t(rate);
-    uart_write_nl();
+    // ADC0 (throttle)
+    ADMUX = (1<<REFS0);
+    ADCSRA |= (1<<ADSC);
+    while(ADCSRA & (1<<ADSC));
+    voltage = (uint32_t)65 * ADC;
+
+    update_sine();
+    _delay_us(100);
+    //uart_write_uint32_t(x);
+    //uart_write_byte(',');
+    //uart_write_uint32_t(y);
+    //uart_write_nl();
   }
 
 }
