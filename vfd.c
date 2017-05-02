@@ -9,11 +9,15 @@ uint32_t sine_position_msb;
 uint32_t voltage;
 
 // PCINT0 handles the rotary encoder
-// Turninng the rotary encoder changes the rate of sine wave increment
+// Each pulse from the encoder increments the sine wave position
 ISR(PCINT0_vect)
 {
-  //sine_position += 13981; // 13981 = synchronous speed
+  // The angle by which we increment the output sine for each pulse determines slip
+  // 13981 = synchronous speed
   sine_position += 20971; // 150%
+  
+  // Note: We don't actually know the frequency, we just advance the sine wave
+  // relative to the rotor position.
 }
 
 // This method writes data from sine tables to the PWMs
@@ -21,12 +25,11 @@ void update_sine()
 {
   sine_position_msb = ((sine_position & 0xFF0000) >> 16);
 
-  // This is an approximation of line voltage ???
-  //voltage = (labs(rate) * 2);
-
   // Limit to bus voltage
   if(voltage > 65536) voltage = 65536;
-
+  
+  // TODO: We should calculate the current frequency and scale voltage to V/Hz
+  
   // Lookup positions in sine table, multiply by voltage, and sent to PWM
   OCR3B = (voltage * sine_ocr3b[sine_position_msb]) >> 16;
   OCR3C = (voltage * sine_ocr3c[sine_position_msb]) >> 16;
@@ -88,15 +91,22 @@ int main()
   sei();
 
   uint16_t n;
+  
+  // Main loop
   while(1) {
     // ADC0 (throttle)
     ADMUX = (1<<REFS0);
     ADCSRA |= (1<<ADSC);
     while(ADCSRA & (1<<ADSC));
+    // Throttle controls voltage
     voltage = (uint32_t)65 * ADC;
 
+    // Go ahead and output current sine position and voltage to PWM
     update_sine();
+    
+    // Not really sure we need to sleep here
     _delay_us(100);
+
     //uart_write_uint32_t(x);
     //uart_write_byte(',');
     //uart_write_uint32_t(y);
