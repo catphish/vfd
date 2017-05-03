@@ -5,31 +5,41 @@
 #include "sine.h"
 
 uint32_t sine_position;
-uint32_t sine_position_msb;
-uint32_t voltage;
+uint32_t counter;
+uint32_t last_counter;
+uint32_t throttle;
 
 // PCINT0 handles the rotary encoder
 // Each pulse from the encoder increments the sine wave position
 ISR(PCINT0_vect)
 {
-  // The angle by which we increment the output sine for each pulse determines slip
-  // 13981 = synchronous speed
-  //sine_position += 15379; // 110%
-  sine_position += 14680; // 105%
+  // Increment the sine wave by the angle of rotation
+  sine_position += 13981; // 13981 = synchronous speed
 
-  // Note: We don't actually know the frequency, we just advance the sine wave
-  // relative to the rotor position.
+  // Advance a regular counter that can be used to calculate the angular speed
+  counter++;
+}
+
+// Timer 1 will also increment the sine wave, this time by a fixed slip
+ISR(TIMER1_COMPA_vect)
+{
+  // This runs at 1000Hz, slip = 1Hz @ +16777
+  sine_position += 83885; // 5Hz
 }
 
 // This method writes data from sine tables to the PWMs
 void update_sine()
 {
+  uint32_t sine_position_msb;
+  uint32_t voltage;
   sine_position_msb = ((sine_position & 0xFF0000) >> 16);
+
+  // Scale V/Hz with throttle?
+  voltage = throttle * 65;
 
   // Limit to bus voltage
   if(voltage > 65536) voltage = 65536;
 
-  // TODO: We should calculate the current frequency and scale voltage to V/Hz
 
   // Lookup positions in sine table, multiply by voltage, and sent to PWM
   OCR3B = (voltage * sine_ocr3b[sine_position_msb]) >> 16;
@@ -50,6 +60,8 @@ int main()
 {
   // Initialize variables
   sine_position = 0;
+  counter = 0;
+  last_counter = 0;
 
   // Set port F as input
   DDRF = 0;
@@ -75,6 +87,13 @@ int main()
   TCCR4B = _BV(WGM42) | _BV(WGM43) | _BV(CS40);  // Port 6,7,8
   ICR4 = 0x3FF;
 
+  // Configure timer 1, this will increment sine wave
+  TCCR1A = 0;
+  TCCR1B = (1<<CS11) | (1<<WGM12); // Prescale (/8), CTC mode
+  TCNT1 = 0;                       // Zero the timer
+  TIMSK1 |= (1 << OCIE1A);         // Enable match interrupt
+  OCR1A = 2000;                    // 1000 Hz
+
   // Initialize serial output
   uart_init();
 
@@ -98,12 +117,13 @@ int main()
     // ADC0 (throttle)
     ADMUX = (1<<REFS0);
     ADCSRA |= (1<<ADSC);
-    while(ADCSRA & (1<<ADSC));
-    // Throttle controls voltage
-    voltage = (uint32_t)65 * ADC;
-
-    // Go ahead and output current sine position and voltage to PWM
+    // Output current sine position / voltage to PWM while we wait for the ADC
     update_sine();
+    while(ADCSRA & (1<<ADSC)) {
+      update_sine();
+    }
+    // Throttle controls voltage
+    throttle = ADC;
 
     //uart_write_uint32_t(x);
     //uart_write_byte(',');
