@@ -5,26 +5,28 @@
 #include "sine.h"
 
 uint32_t sine_position;
-uint32_t counter;
-uint32_t last_counter;
 uint32_t throttle;
+
+// Motor wants 10% slip
+// Or maybe it wants 5Hz slip
+// We currently provide electrical signal at: 1.05 x rotor speed + 1.75Hz
+
+// We probably can't do any regen braking yet because we never
+// drive at negative slip.
 
 // PCINT0 handles the rotary encoder
 // Each pulse from the encoder increments the sine wave position
 ISR(PCINT0_vect)
 {
   // Increment the sine wave by the angle of rotation
-  sine_position += 13981; // 13981 = synchronous speed
-
-  // Advance a regular counter that can be used to calculate the angular speed
-  counter++;
+  sine_position += 14680; // 13981 = synchronous speed
 }
 
 // Timer 1 will also increment the sine wave, this time by a fixed slip
 ISR(TIMER1_COMPA_vect)
 {
   // This runs at 1000Hz, slip = 1Hz @ +16777
-  sine_position += 83885; // 5Hz
+  sine_position += 29360; // add constant slip equal to 2 increments
 }
 
 // This method writes data from sine tables to the PWMs
@@ -34,12 +36,10 @@ void update_sine()
   uint32_t voltage;
   sine_position_msb = ((sine_position & 0xFF0000) >> 16);
 
-  // Scale V/Hz with throttle?
-  voltage = throttle * 65;
-
+  // Scale voltage by throttle, currently we use only the throttle value
+  voltage = (65 * throttle);
   // Limit to bus voltage
   if(voltage > 65536) voltage = 65536;
-
 
   // Lookup positions in sine table, multiply by voltage, and sent to PWM
   OCR3B = (voltage * sine_ocr3b[sine_position_msb]) >> 16;
@@ -60,8 +60,6 @@ int main()
 {
   // Initialize variables
   sine_position = 0;
-  counter = 0;
-  last_counter = 0;
 
   // Set port F as input
   DDRF = 0;
@@ -86,6 +84,11 @@ int main()
   TCCR4A = _BV(WGM41); // Port 6,7,8
   TCCR4B = _BV(WGM42) | _BV(WGM43) | _BV(CS40);  // Port 6,7,8
   ICR4 = 0x3FF;
+
+  // Configure timer 5, we'll use this to record the period between pulses
+  TCCR5A = 0;
+  TCCR5B = (1<<CS50);              // Prescale (/1), Normal mode
+  TCNT5 = 0;                       // Zero the timer
 
   // Configure timer 1, this will increment sine wave
   TCCR1A = 0;
@@ -125,9 +128,9 @@ int main()
     // Throttle controls voltage
     throttle = ADC;
 
-    //uart_write_uint32_t(x);
+    //uart_write_uint32_t(throttle);
     //uart_write_byte(',');
-    //uart_write_uint32_t(y);
+    //uart_write_uint16_t(counter_copy);
     //uart_write_nl();
   }
 

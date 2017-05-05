@@ -31,6 +31,12 @@ void uart_write_int32_t(int32_t i) {
   uart_sendstring(buffer);
 }
 
+void uart_write_uint16_t(uint16_t i) {
+  char buffer[20];
+  utoa(i, buffer, 10);
+  uart_sendstring(buffer);
+}
+
 void uart_write_uint32_t(uint32_t i) {
   char buffer[20];
   ultoa(i, buffer, 10);
