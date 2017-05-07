@@ -6,40 +6,60 @@
 
 uint32_t sine_position;
 uint32_t throttle;
-
-// Motor wants 10% slip
-// Or maybe it wants 5Hz slip
-// We currently provide electrical signal at: 1.05 x rotor speed + 1.75Hz
-
-// We probably can't do any regen braking yet because we never
-// drive at negative slip.
+uint32_t speed;
+uint32_t speed_copy;
+char counter;
 
 // PCINT0 handles the rotary encoder
 // Each pulse from the encoder increments the sine wave position
+// This allows us to make *relative* adjustments to slip
 ISR(PCINT0_vect)
 {
-  // Increment the sine wave by the angle of rotation
-  sine_position += 14680; // 13981 = synchronous speed
+  // 13981 = synchronous speed
+  // Increment the sine by somewhat below synchronous
+  // speed to enable braking at very low throttle
+  sine_position += 12000;
+  speed += 12000;
+  // Increment relative slip based on throttle
+  sine_position += throttle*2;
+  speed += throttle*2;
 }
 
-// Timer 1 will also increment the sine wave, this time by a fixed slip
+// Timer 1 runs at fixed intervals of 1kHz
+// This allows us to make *absolute* adjustments to slip
 ISR(TIMER1_COMPA_vect)
 {
-  // This runs at 1000Hz, slip = 1Hz @ +16777
-  sine_position += 29360; // add constant slip equal to 2 increments
+  // +1Hz = +16777
+  // Add some fixed slip according to the throttle position
+  sine_position += 164 * (throttle);
+  speed += 164 * (throttle);
+
+  // Cache the speed every 20 iterations (50Hz)
+  // This data will be used to calculate V/Hz later
+  counter++;
+  if(counter > 19) {
+    speed_copy = speed;
+    speed = 0;
+    counter = 0;
+  }
 }
 
 // This method writes data from sine tables to the PWMs
+// The sine output is multiplied by an appropriate voltage
+// This should be called as often as possible in the main loop
 void update_sine()
 {
   uint32_t sine_position_msb;
   uint32_t voltage;
+  // Discard the least significant 16 bits and most significant
+  // 8 bits from 32-bit sine position. We only have an 8-bit table
   sine_position_msb = ((sine_position & 0xFF0000) >> 16);
 
-  // Scale voltage by throttle, currently we use only the throttle value
-  voltage = (65 * throttle);
-  // Limit to bus voltage
-  if(voltage > 65536) voltage = 65536;
+  // Scale voltage with frequency
+  // This should give us full voltage at 12.5Hz
+  voltage = speed_copy >> 7;
+  // Cap at line voltage
+  if(voltage > 65535) voltage = 65535;
 
   // Lookup positions in sine table, multiply by voltage, and sent to PWM
   OCR3B = (voltage * sine_ocr3b[sine_position_msb]) >> 16;
@@ -60,6 +80,9 @@ int main()
 {
   // Initialize variables
   sine_position = 0;
+  speed = 0;
+  speed_copy = 0;
+  counter = 0;
 
   // Set port F as input
   DDRF = 0;
@@ -84,11 +107,6 @@ int main()
   TCCR4A = _BV(WGM41); // Port 6,7,8
   TCCR4B = _BV(WGM42) | _BV(WGM43) | _BV(CS40);  // Port 6,7,8
   ICR4 = 0x3FF;
-
-  // Configure timer 5, we'll use this to record the period between pulses
-  TCCR5A = 0;
-  TCCR5B = (1<<CS50);              // Prescale (/1), Normal mode
-  TCNT5 = 0;                       // Zero the timer
 
   // Configure timer 1, this will increment sine wave
   TCCR1A = 0;
