@@ -131,8 +131,6 @@ int main()
   // Enable interrupts globally
   sei();
 
-  uint16_t n;
-
   // Main loop
   while(1) {
     // ADC0 (throttle)
