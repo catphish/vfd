@@ -62,18 +62,30 @@ void update_sine()
   if(voltage > 65535) voltage = 65535;
 
   // Lookup positions in sine table, multiply by voltage, and sent to PWM
-  OCR3B = (voltage * sine_ocr3b[sine_position_msb]) >> 16;
-  OCR3C = (voltage * sine_ocr3c[sine_position_msb]) >> 16;
+  if(sine_a_direction[sine_position_msb]) {
+    OCR3B = 511 + ((voltage * sine_a[sine_position_msb]) >> 16);
+    OCR3C = 511 + ((voltage * sine_a[sine_position_msb]) >> 16);
+  } else {
+    OCR3B = 511 - ((voltage * sine_a[sine_position_msb]) >> 16);
+    OCR3C = 511 - ((voltage * sine_a[sine_position_msb]) >> 16);
+  }
 
-  OCR3A = (voltage * sine_ocr3a[sine_position_msb]) >> 16;
-  OCR4A = (voltage * sine_ocr4a[sine_position_msb]) >> 16;
+  if(sine_b_direction[sine_position_msb]) {
+    OCR3A = 511 + ((voltage * sine_b[sine_position_msb]) >> 16);
+    OCR4A = 511 + ((voltage * sine_b[sine_position_msb]) >> 16);
+  } else {
+    OCR3A = 511 - ((voltage * sine_b[sine_position_msb]) >> 16);
+    OCR4A = 511 - ((voltage * sine_b[sine_position_msb]) >> 16);
+  }
 
-  OCR4B = (voltage * sine_ocr4b[sine_position_msb]) >> 16;
-  OCR4C = (voltage * sine_ocr4c[sine_position_msb]) >> 16;
+  if(sine_c_direction[sine_position_msb]) {
+    OCR4B = 511 + ((voltage * sine_c[sine_position_msb]) >> 16);
+    OCR4C = 511 + ((voltage * sine_c[sine_position_msb]) >> 16);
+  } else {
+    OCR4B = 511 - ((voltage * sine_c[sine_position_msb]) >> 16);
+    OCR4C = 511 - ((voltage * sine_c[sine_position_msb]) >> 16);
+  }
 
-  // These final tables switch on either the positive or negative PWM pins.
-  TCCR3A = sine_tccr3a[sine_position_msb] | _BV(WGM31);
-  TCCR4A = sine_tccr4a[sine_position_msb] | _BV(WGM41);
 }
 
 int main()
@@ -107,6 +119,10 @@ int main()
   TCCR4A = _BV(WGM41); // Port 6,7,8
   TCCR4B = _BV(WGM42) | _BV(WGM43) | _BV(CS40);  // Port 6,7,8
   ICR4 = 0x3FF;
+
+  TCCR3A = _BV(COM3B1) | _BV(COM3C1) | _BV(COM3C0) | _BV(COM3A1) | _BV(WGM31);
+  TCCR4A = _BV(COM4B1) | _BV(COM4C1) | _BV(COM4C0) | _BV(COM4A1) | _BV(COM4A0) | _BV(WGM41);
+
 
   // Configure timer 1, this will increment sine wave
   TCCR1A = 0;
