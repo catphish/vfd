@@ -18,11 +18,11 @@ ISR(PCINT0_vect)
   // 13981 = synchronous speed
   // Increment the sine by somewhat below synchronous
   // speed to enable braking at very low throttle
-  sine_position += 12000;
-  speed += 12000;
+  //sine_position += 12000;
+  //speed += 12000;
   // Increment relative slip based on throttle
-  sine_position += throttle*2;
-  speed += throttle*2;
+  //sine_position += throttle*2;
+  //speed += throttle*2;
 }
 
 // Timer 1 runs at fixed intervals of 1kHz
@@ -31,8 +31,8 @@ ISR(TIMER1_COMPA_vect)
 {
   // +1Hz = +16777
   // Add some fixed slip according to the throttle position
-  sine_position += 164 * (throttle);
-  speed += 164 * (throttle);
+  sine_position += 205 * throttle; // Max at 12.5Hz
+  speed += 205 * throttle;
 
   // Cache the speed every 20 iterations (50Hz)
   // This data will be used to calculate V/Hz later
@@ -57,7 +57,7 @@ void update_sine()
 
   // Scale voltage with frequency
   // This should give us full voltage at 12.5Hz
-  voltage = speed_copy >> 7;
+  voltage = speed_copy >> 6;
   // Cap at line voltage
   if(voltage > 65535) voltage = 65535;
 
@@ -146,7 +146,7 @@ int main()
 
     //uart_write_uint32_t(throttle);
     //uart_write_byte(',');
-    //uart_write_uint16_t(counter_copy);
+    //uart_write_uint32_t(speed_copy);
     //uart_write_nl();
   }
 
