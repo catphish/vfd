@@ -15,38 +15,38 @@ char counter;
 // This allows us to make *relative* adjustments to slip
 ISR(PCINT0_vect)
 {
-  // 13981 = synchronous speed
-  // Increment the sine by somewhat below synchronous
-  // speed to enable braking at very low throttle
-  //sine_position += 12000;
-  //speed += 12000;
-  // Increment relative slip based on throttle
-  //sine_position += throttle*2;
-  //speed += throttle*2;
+  // One complete sine wave = 65536*256 increments of the sine wave
+  // The rotary encoder returns 2400 pulses per rotor rotation
+  // (but only 1200 per sine because it's a 4-pole motor)
+  // 65536*256 / 1200 = 13981 = synchronous speed
+  sine_position += 13981;
+  // The sum of the variable speed is used later to calculate V/Hz
+  // based on how fast we're incrementing.
+  speed += 13981;
 }
 
 // Timer 1 runs at fixed intervals of 1kHz
 // This allows us to make *absolute* adjustments to slip
 ISR(TIMER1_COMPA_vect)
 {
-  // +1Hz = +16777
-  // Add some fixed slip according to the throttle position
-  sine_position += 205 * throttle; // Max at 12.5Hz
-  speed += 205 * throttle;
+  // 1 thousandth of a sine rotation is 65536*256 / 1000 = 16777
+  // Therefore for each 1Hz of slip, we add 16777 in this 1kHz timer
 
-  // Cache the speed every 20 iterations (50Hz)
+  // Add fixed slip (10Hz)
+  sine_position += 167770;
+  speed += 167770;
+
+  // Cache the sum of speed into speed_copy every 20 iterations (50Hz)
   // This data will be used to calculate V/Hz later
-  counter++;
-  if(counter > 19) {
+  if(++counter > 19) {
     speed_copy = speed;
-    speed = 0;
-    counter = 0;
+    speed = counter = 0;
   }
 }
 
-// This method writes data from sine tables to the PWMs
-// The sine output is multiplied by an appropriate voltage
-// This should be called as often as possible in the main loop
+// This method calculates the appropriate output voltage based
+// on various factors, looks up the output position in the sine
+// wave tables, and outputs the product to the PWMs.
 void update_sine()
 {
   uint32_t sine_position_msb;
@@ -55,10 +55,26 @@ void update_sine()
   // 8 bits from 32-bit sine position. We only have an 8-bit table
   sine_position_msb = ((sine_position & 0xFF0000) >> 16);
 
-  // Scale voltage with frequency
-  // This should give us full voltage at 12.5Hz
+  // Calculate the portion of voltage due to current output frequency.
+  // In the input (speed_copy), 16777 * 20 = 1Hz
+  // In the output, AC voltage = rail voltage / sqrt(2) / 65535
+  // Currently: 77.7 / 1.4142 / 65535, each output unit equals 0.000838364v
+  // There if voltage = speed_copy, 1Hz = 281.3 VAC
+  // We shift this 6 bits to get 4.39V/Hz, a reasonable value for my motor.
   voltage = speed_copy >> 6;
+
+  // We have a target current of 1A. Each motor coil has a resistance of 47 Ohm.
+  // On average, we are driving 2 coils, so we consider the motor resistance to
+  // be 23.5Ohm. Therefore we add 23.5 VAC (33.2VDC) to achieve 1A at DC.
+  voltage = voltage + 39601;
+
   // Cap at line voltage
+  if(voltage > 65535) voltage = 65535;
+
+  // Scale with throttle
+  voltage = (voltage * throttle) >> 10;
+
+  // Cap at line voltage again, probably unnecessary.
   if(voltage > 65535) voltage = 65535;
 
   // Lookup positions in sine table, multiply by voltage, and sent to PWM
