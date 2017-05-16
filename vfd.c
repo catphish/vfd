@@ -32,9 +32,9 @@ ISR(TIMER1_COMPA_vect)
   // 1 thousandth of a sine rotation is 65536*256 / 1000 = 16777
   // Therefore for each 1Hz of slip, we add 16777 in this 1kHz timer
 
-  // Add fixed slip (10Hz)
-  sine_position += 167770;
-  speed += 167770;
+  // Add fixed slip (5Hz)
+  sine_position += 83885;
+  speed += 83885;
 
   // Cache the sum of speed into speed_copy every 20 iterations (50Hz)
   // This data will be used to calculate V/Hz later
@@ -66,7 +66,7 @@ void update_sine()
   // We have a target current of 1A. Each motor coil has a resistance of 47 Ohm.
   // On average, we are driving 2 coils, so we consider the motor resistance to
   // be 23.5Ohm. Therefore we add 23.5 VAC (33.2VDC) to achieve 1A at DC.
-  voltage = voltage + 39601;
+  voltage = voltage + 28030;
 
   // Cap at line voltage
   if(voltage > 65535) voltage = 65535;
