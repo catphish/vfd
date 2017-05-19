@@ -32,9 +32,9 @@ ISR(TIMER1_COMPA_vect)
   // 1 thousandth of a sine rotation is 65536*256 / 1000 = 16777
   // Therefore for each 1Hz of slip, we add 16777 in this 1kHz timer
 
-  // Add fixed slip (5Hz)
-  sine_position += 83885;
-  speed += 83885;
+  // Add fixed slip (10Hz)
+  sine_position += 167770;
+  speed += 167770;
 
   // Cache the sum of speed into speed_copy every 20 iterations (50Hz)
   // This data will be used to calculate V/Hz later
@@ -58,15 +58,15 @@ void update_sine()
   // Calculate the portion of voltage due to current output frequency.
   // In the input (speed_copy), 16777 * 20 = 1Hz
   // In the output, AC voltage = rail voltage / sqrt(2) / 65535
-  // Currently: 77.7 / 1.4142 / 65535, each output unit equals 0.000838364v
-  // There if voltage = speed_copy, 1Hz = 281.3 VAC
-  // We shift this 6 bits to get 4.39V/Hz, a reasonable value for my motor.
-  voltage = speed_copy >> 6;
+  // Currently: 77.7*4 / 1.4142 / 65535, each output unit equals 0.003353489v
+  // There if voltage = speed_copy, 1Hz = 1125.2 VAC
+  // We shift this 8 bits to get 4.39V/Hz, a reasonable value for my motor.
+  // We'll want a more accurate way to tune this.
+  voltage = speed_copy >> 8;
 
-  // We have a target current of 1A. Each motor coil has a resistance of 47 Ohm.
-  // On average, we are driving 2 coils, so we consider the motor resistance to
-  // be 23.5Ohm. Therefore we add 23.5 VAC (33.2VDC) to achieve 1A at DC.
-  voltage = voltage + 28030;
+  // We boost the voltage a bit to give more torque at low frequency.
+  // This is quite arbitrary. Current value is 10% of line voltage.
+  voltage = voltage + 6552;
 
   // Cap at line voltage
   if(voltage > 65535) voltage = 65535;
