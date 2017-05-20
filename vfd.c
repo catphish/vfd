@@ -19,10 +19,10 @@ ISR(PCINT0_vect)
   // The rotary encoder returns 2400 pulses per rotor rotation
   // (but only 1200 per sine because it's a 4-pole motor)
   // 65536*256 / 1200 = 13981 = synchronous speed
-  sine_position += 13981;
+  sine_position += 13981*2;
   // The sum of the variable speed is used later to calculate V/Hz
   // based on how fast we're incrementing.
-  speed += 13981;
+  speed += 13981*2;
 }
 
 // Timer 1 runs at fixed intervals of 1kHz
@@ -66,6 +66,8 @@ void update_sine()
 
   // We boost the voltage a bit to give more torque at low frequency.
   // This is quite arbitrary. Current value is 10% of line voltage.
+  // At 10% slip, this results in a total locked rotor voltage of
+  // 19659 (about 66 VAC)
   voltage = voltage + 6552;
 
   // Cap at line voltage
@@ -141,7 +143,7 @@ int main()
   // Configure pin change interrupt on PCINT0
   DDRB = 0;      // Input
   PORTB = 0xFF;  // Pull High
-  PCMSK0 = 3;    // Trigger on pins 0 and 1
+  PCMSK0 = 1;    // Trigger on pins 0 and 1
   PCICR = 1;     // Enable PCIE0
 
   // Enable interrupts globally
