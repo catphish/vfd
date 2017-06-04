@@ -54,12 +54,12 @@ ISR(TIMER1_COMPA_vect)
 // the necessary timings for space vector modulation in 6 segments.
 void update_svm()
 {
-  uint16_t sine_position_msb;
+  uint16_t sine_angle;
   uint16_t voltage;
   uint8_t sine_segment;
   // Discard the least significant 14 bits and most significant
   // 8 bits from 32-bit sine position. We can only make use of 10 bits
-  sine_position_msb = ((sine_position & 0xFFC000) >> 14);
+  sine_angle = ((sine_position & 0xFFC000) >> 14);
   // The most significant 8 bits contain the SVM segment (0-5)
   sine_segment = sine_position >> 24;
 
@@ -72,13 +72,13 @@ void update_svm()
   case 0:
     // 100 -> 110
     OCR3A = voltage;
-    OCR3B = ((sine_position_msb + 1) * (voltage + 1) - 1) >> 10;
+    OCR3B = ((sine_angle + 1) * (voltage + 1) - 1) >> 10;
     OCR3C = 0;
     break;
 
   case 1:
     // 110 -> 010
-    OCR3A = ((1024 - sine_position_msb) * (voltage + 1) - 1) >> 10;
+    OCR3A = ((1024 - sine_angle) * (voltage + 1) - 1) >> 10;
     OCR3B = voltage;
     OCR3C = 0;
     break;
@@ -87,19 +87,19 @@ void update_svm()
     // 010 -> 011
     OCR3A = 0;
     OCR3B = voltage;
-    OCR3C = ((sine_position_msb + 1) * (voltage + 1) - 1) >> 10;
+    OCR3C = ((sine_angle + 1) * (voltage + 1) - 1) >> 10;
     break;
 
   case 3:
     // 011 -> 001
     OCR3A = 0;
-    OCR3B = ((1024 - sine_position_msb) * (voltage + 1) - 1) >> 10;
+    OCR3B = ((1024 - sine_angle) * (voltage + 1) - 1) >> 10;
     OCR3C = voltage;
     break;
 
   case 4:
     // 001 -> 101
-    OCR3A = ((sine_position_msb + 1) * (voltage + 1) - 1) >> 10;
+    OCR3A = ((sine_angle + 1) * (voltage + 1) - 1) >> 10;
     OCR3B = 0;
     OCR3C = voltage;
     break;
@@ -108,7 +108,7 @@ void update_svm()
     // 101 -> 100
     OCR3A = voltage;
     OCR3B = 0;
-    OCR3C = ((1024 - sine_position_msb) * (voltage + 1) - 1) >> 10;
+    OCR3C = ((1024 - sine_angle) * (voltage + 1) - 1) >> 10;
     break;
   }
 }
