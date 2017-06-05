@@ -3,43 +3,53 @@
 #include <stdlib.h>
 #include "uart.h"
 
-uint32_t sine_position;
-uint32_t throttle;
-uint32_t speed;
-uint32_t speed_copy;
-char counter;
+uint32_t sine_position; // Stores the current angle of the sine wave output
+                        // 0 - 360 degrees = (0 - 0x5ffffff)
+uint32_t throttle;      // Stores the current throttle input (10 bit)
+uint32_t speed;         // Incremented and later used to estimate roational speed
+uint32_t speed_copy;    // A cached copy of speed, used as an estimate of speed
+char counter;           // Just a counter that we use to count some cycles
 
 void wrap_sine_position() {
+  // This ensures that any time sine_position is inremented, it stays in range
   if(sine_position >= 0x6000000) sine_position -= 0x6000000;
 }
 
 // PCINT0 handles the rotary encoder
 // Each pulse from the encoder increments the sine wave position
-// This allows us to make *relative* adjustments to slip
+// This also allows us to make relative adjustments to slip if necessary
 ISR(PCINT0_vect)
 {
-  // One complete sine wave = 65536*256*6 increments of the sine wave
-  // The rotary encoder returns 1200 pulses per rotor rotation
-  // (but only 600 per sine because it's a 4-pole motor)
-  // 65536*256*6 / 600 = 13981 = synchronous speed
+  // One complete sine wave = 65536*256*6 increments
+  // The rotary encoder returns 600 pulses per rotor rotation
+  // With our 4 pole motor this means 300 pulses per sine wave
+  // 300 pulses = 600 interrupts (high/low)
+  // 65536*256*6 / 600 = 167772
+  // Increment by 167772 for synchronous speed
   sine_position += 167772;
-  // The sum of the variable speed is used later to calculate V/Hz
-  // based on how fast we're incrementing.
+
+  // We also increment `speed` which is inspected at fixed intervals
+  // to determine the rotational speed, and later, V/Hz.
   speed += 167772;
 
+  // Ensure we stay in range
   wrap_sine_position();
 }
 
 // Timer 1 runs at fixed intervals of 1kHz
-// This allows us to make *absolute* adjustments to slip
+// This allows us to make absolute adjustments to slip
 ISR(TIMER1_COMPA_vect)
 {
   // 1 thousandth of a sine rotation is 65536*256*6 / 1000 = 100663
   // Therefore for each 1Hz of slip, we add 100663 in this 1kHz timer
 
-  // Add fixed slip (10Hz)
+  // Add fixed slip of 10Hz (100663.3 * 10)
   sine_position += 1006633;
+  // Increment speed as above
   speed += 1006633;
+
+  // Ensure we stay in range
+  wrap_sine_position();
 
   // Cache the sum of speed into speed_copy every 20 iterations (50Hz)
   // This data will be used to calculate V/Hz later
@@ -47,19 +57,20 @@ ISR(TIMER1_COMPA_vect)
     speed_copy = speed;
     speed = counter = 0;
   }
-  wrap_sine_position();
 }
 
 // This method calculates the appropriate PWM outputs by calculating
 // the necessary timings for space vector modulation in 6 segments.
 void update_svm()
 {
-  uint16_t sine_angle;
-  uint16_t voltage;
-  uint8_t sine_segment;
+  uint16_t sine_angle;  // The angle within the current segment (10 bits)
+  uint16_t voltage;     // The voltage to apply (10 bits)
+  uint8_t sine_segment; // The current segment of rotation (0-5)
+
   // Discard the least significant 14 bits and most significant
   // 8 bits from 32-bit sine position. We can only make use of 10 bits
   sine_angle = ((sine_position & 0xFFC000) >> 14);
+
   // The most significant 8 bits contain the SVM segment (0-5)
   sine_segment = sine_position >> 24;
 
@@ -125,12 +136,12 @@ int main()
   DDRF = 0;
   PORTF = 0;
 
-  // set pins for output
-  DDRE |= _BV(DDE3); // 5
-  DDRE |= _BV(DDE4); // 2
-  DDRE |= _BV(DDE5); // 3
+  // set PORT E pins for output
+  DDRE |= _BV(DDE3); // A5
+  DDRE |= _BV(DDE4); // A2
+  DDRE |= _BV(DDE5); // A3
 
-  // Clear digital outputs
+  // Clear PORT E digital outputs
   PORTE = 0; // Port 2,3,5
 
   // Configure PWM channels and timer 3
@@ -173,6 +184,7 @@ int main()
     // Throttle controls voltage
     throttle = ADC;
 
+    // Example uart code, in case we want to debug something
     //uart_write_uint32_t(throttle);
     //uart_write_byte(',');
     //uart_write_uint32_t(speed_copy);
