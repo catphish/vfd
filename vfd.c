@@ -75,52 +75,59 @@ void update_svm()
   // The most significant 8 bits contain the SVM segment (0-5)
   sine_segment = sine_position >> 24;
 
-  // To keep things simple, we'll just set the amplitude to the
-  // throttle position. No V/Hz yet.
-  voltage = throttle;
+  // Calculate V/Hz. The following calculation causes full voltage to
+  // be applied at 66.67Hz
+  voltage = speed_copy >> 11;
+  // Limit voltage to line voltage, obviously
+  if(voltage > 65535) voltage = 65535;
+  // Lower limit on voltage to give a boost at low frequency to
+  // overcome constant resistance.
+  if(voltage < 10000) voltage = 10000;
+  voltage = (voltage + 1) * (throttle + 1) - 1;
+  voltage = voltage >> 15;
 
   // Set up space vector modulation according to segment, angle, and voltage
   switch(sine_segment) {
   case 0:
     // 100 -> 110
-    OCR3A = ((voltage + 1) * table[sine_angle] - 1) >> 10;
-    OCR3B = ((sine_angle + 1) * (voltage + 1) * table[sine_angle] - 1) >> 20;
+    OCR3A = ((voltage + 1) * table[sine_angle] - 1) >> 11;
+    OCR3B = ((sine_angle + 1) * (voltage + 1) * table[sine_angle] - 1) >> 21;
     OCR3C = 0;
     break;
 
   case 1:
     // 110 -> 010
-    OCR3A = ((1024 - sine_angle) * (voltage + 1) * table[sine_angle] - 1) >> 20;
-    OCR3B = ((voltage + 1) * table[sine_angle] - 1) >> 10;
+    OCR3A = ((1024 - sine_angle) * (voltage + 1) * table[sine_angle] - 1) >> 21;
+    OCR3B = ((voltage + 1) * table[sine_angle] - 1) >> 11;
     OCR3C = 0;
     break;
 
   case 2:
     // 010 -> 011
     OCR3A = 0;
-    OCR3B = ((voltage + 1) * table[sine_angle] - 1) >> 10;
-    OCR3C = ((sine_angle + 1) * (voltage + 1) * table[sine_angle] - 1) >> 20;
+    OCR3B = ((voltage + 1) * table[sine_angle] - 1) >> 11;
+    OCR3C = ((sine_angle + 1) * (voltage + 1) * table[sine_angle] - 1) >> 21;
     break;
 
   case 3:
     // 011 -> 001
     OCR3A = 0;
-    OCR3B = ((1024 - sine_angle) * (voltage + 1) * table[sine_angle] - 1) >> 20;
-    OCR3C = ((voltage + 1) * table[sine_angle] - 1) >> 10;
+    OCR3B = ((1024 - sine_angle) * (voltage + 1) * table[sine_angle] - 1) >> 21;
+    OCR3C = ((voltage + 1) * table[sine_angle] - 1) >> 11;
     break;
 
   case 4:
     // 001 -> 101
-    OCR3A = ((sine_angle + 1) * (voltage + 1) * table[sine_angle] - 1) >> 20;
+    OCR3A = ((sine_angle + 1) * (voltage + 1) * table[sine_angle] - 1) >> 21;
     OCR3B = 0;
-    OCR3C = ((voltage + 1) * table[sine_angle] - 1) >> 10;
+    OCR3C = ((voltage + 1) * table[sine_angle] - 1) >> 11;
     break;
 
   case 5:
     // 101 -> 100
-    OCR3A = ((voltage + 1) * table[sine_angle] - 1) >> 10;
+    OCR3A = ((voltage + 1) * table[sine_angle] - 1) >> 11;
     OCR3B = 0;
-    OCR3C = ((1024 - sine_angle) * (voltage + 1) * table[sine_angle] - 1) >> 20;
+    OCR3C = ((1024 - sine_angle) * (voltage + 1) * table[sine_angle] - 1) >> 21;
     break;
   }
 }
