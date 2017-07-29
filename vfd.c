@@ -44,10 +44,10 @@ ISR(TIMER1_COMPA_vect)
   // 1 thousandth of a sine rotation is 65536*256*6 / 1000 = 100663
   // Therefore for each 1Hz of slip, we add 100663 in this 1kHz timer
 
-  // Add fixed slip of 5Hz (100663.3 * 5)
-  sine_position += 503316;
+  // Add fixed slip according to throttle. 10Hz.
+  sine_position += (98 * throttle * 10);
   // Increment speed as above
-  speed += 503316;
+  speed += (98 * throttle * 10);
 
   // Ensure we stay in range
   wrap_sine_position();
@@ -75,16 +75,17 @@ void update_svm()
   // The most significant 8 bits contain the SVM segment (0-5)
   sine_segment = sine_position >> 24;
 
-  // Calculate V/Hz. The following calculation causes full voltage to
-  // be applied at 66.67Hz
-  voltage = speed_copy >> 11;
+  // Calculate V/Hz. Full voltage at 66.6Hz
+  // voltage = speed_copy >> 16;
+
+  // Workaround for only having 1/4 voltage, full voltage at 16.7Hz
+  voltage = speed_copy >> 14;
+
+  // Voltage boost to overcome constant resistance.
+  voltage += 500;
+
   // Limit voltage to line voltage, obviously
-  if(voltage > 65535) voltage = 65535;
-  // Lower limit on voltage to give a boost at low frequency to
-  // overcome constant resistance.
-  if(voltage < 10000) voltage = 10000;
-  voltage = (voltage + 1) * (throttle + 1) - 1;
-  voltage = voltage >> 15;
+  if(voltage > 2047) voltage = 2047;
 
   // Set up space vector modulation according to segment, angle, and voltage
   switch(sine_segment) {
