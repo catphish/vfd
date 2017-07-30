@@ -78,10 +78,12 @@ void update_svm()
   // Calculate V/Hz. Full voltage at 66.6Hz
   // voltage = speed_copy >> 16;
 
-  // Workaround for only having 1/4 voltage, full voltage at 16.7Hz
+  // Workaround for only having 1/4 voltage for teesting.
+  // Full voltage occurs at 16.7Hz instead
   voltage = speed_copy >> 14;
 
   // Voltage boost to overcome constant resistance.
+  // TODO: This needs to scale with throttle / slip
   voltage += 500;
 
   // Limit voltage to line voltage, obviously
