@@ -156,10 +156,13 @@ int main()
   PORTE = 0; // Port 2,3,5
 
   // Configure PWM channels and timer 3
+  // WGM30 | WGM31 | WGM32 configures Fast PWM, 10-bit
+  // CS30 configures 16MHz (ie non-divided) clock speed
+  // 16,000,000 (clock) / 1024 (10 bit resolution) = 15,625 Hz PWM frequency
   TCCR3A = _BV(COM3A1) | _BV(COM3B1) | _BV(COM3C1) | _BV(WGM31) | _BV(WGM30);
   TCCR3B = _BV(WGM32) | _BV(CS30);
 
-  // Configure timer 1, this will increment sine wave
+  // Configure timer 1, this will trigger interrupt at exact 1kHz intervals
   TCCR1A = 0;
   TCCR1B = (1<<CS11) | (1<<WGM12); // Prescale (/8), CTC mode
   TCNT1 = 0;                       // Zero the timer
@@ -187,15 +190,16 @@ int main()
     // ADC0 (throttle)
     ADMUX = (1<<REFS0);
     ADCSRA |= (1<<ADSC);
-    // Output current sine position / voltage to PWM while we wait for the ADC
     update_svm();
+    // Output current sine position to PWM as often as possible
     while(ADCSRA & (1<<ADSC)) {
       update_svm();
     }
-    // Throttle controls voltage
+	// Read throttle from ADC whenever a value is available
     throttle = ADC;
 
-    // Example uart code, in case we want to debug something
+    // UART is available in case we want to debug something
+    // Write to serial port as follows if necessary
     //uart_write_uint32_t(throttle);
     //uart_write_byte(',');
     //uart_write_uint32_t(speed_copy);
