@@ -83,8 +83,8 @@ void update_svm()
   voltage = speed_copy >> 14;
 
   // Voltage boost to overcome constant resistance.
-  // TODO: This needs to scale with throttle / slip
-  voltage += 500;
+  // This needs to scale with throttle / slip
+  voltage += (throttle >> 1);
 
   // Limit voltage to line voltage, obviously
   if(voltage > 2047) voltage = 2047;
@@ -195,7 +195,7 @@ int main()
     while(ADCSRA & (1<<ADSC)) {
       update_svm();
     }
-	// Read throttle from ADC whenever a value is available
+    // Read throttle from ADC whenever a value is available
     throttle = ADC;
 
     // UART is available in case we want to debug something
