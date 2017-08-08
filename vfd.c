@@ -44,10 +44,11 @@ ISR(TIMER1_COMPA_vect)
   // 1 thousandth of a sine rotation is 65536*256*6 / 1000 = 100663
   // Therefore for each 1Hz of slip, we add 100663 in this 1kHz timer
 
-  // Add fixed slip according to throttle. 10Hz.
-  sine_position += (98 * throttle * 10);
+  // Add fixed slip according to throttle. 5Hz.
+  sine_position += (98 * throttle * 5);
+
   // Increment speed as above
-  speed += (98 * throttle * 10);
+  speed += (98 * throttle * 5);
 
   // Ensure we stay in range
   wrap_sine_position();
@@ -78,13 +79,12 @@ void update_svm()
   // Calculate V/Hz. Full voltage at 66.6Hz
   // voltage = speed_copy >> 16;
 
-  // Workaround for only having 1/4 voltage for teesting.
-  // Full voltage occurs at 16.7Hz instead
-  voltage = speed_copy >> 14;
+  // Actual trial-and-error value
+  voltage = (speed_copy >> 15);
 
   // Voltage boost to overcome constant resistance.
   // This needs to scale with throttle / slip
-  voltage += (throttle >> 1);
+  voltage += (throttle >> 0);
 
   // Limit voltage to line voltage, obviously
   if(voltage > 2047) voltage = 2047;
