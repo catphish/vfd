@@ -1,7 +1,6 @@
 #include <avr/interrupt.h>
 #include <util/delay.h>
 #include <stdlib.h>
-#include "uart.h"
 #include "table.h"
 
 uint32_t sine_position; // Stores the current angle of the sine wave output
@@ -76,17 +75,14 @@ void update_svm()
   // The most significant 8 bits contain the SVM segment (0-5)
   sine_segment = sine_position >> 24;
 
-  // Calculate V/Hz. Full voltage at 66.6Hz
-  // voltage = speed_copy >> 16;
-
-  // Actual trial-and-error value
-  voltage = (speed_copy >> 15);
-
-  // Voltage boost to overcome constant resistance.
-  // This needs to scale with throttle / slip
-  voltage += (throttle >> 0);
+  // Set voltage according to throttle
+  // Currently the throttle applies full voltage.
+  // With higher supply voltages we will want to cap this
+  // with a V/Hz curve to prevent excessive current.
+  voltage = throttle * 2; // 0-2046
 
   // Limit voltage to line voltage, obviously
+  // Currently redundant but left in for safety
   if(voltage > 2047) voltage = 2047;
 
   // Set up space vector modulation according to segment, angle, and voltage
@@ -169,9 +165,6 @@ int main()
   TIMSK1 |= (1 << OCIE1A);         // Enable match interrupt
   OCR1A = 2000;                    // 1000 Hz
 
-  // Initialize serial output
-  uart_init();
-
   // Initialize ADC
   ADMUX = (1<<REFS0);
   ADCSRA = (1<<ADEN)|(1<<ADPS1);
@@ -198,12 +191,6 @@ int main()
     // Read throttle from ADC whenever a value is available
     throttle = ADC;
 
-    // UART is available in case we want to debug something
-    // Write to serial port as follows if necessary
-    //uart_write_uint32_t(throttle);
-    //uart_write_byte(',');
-    //uart_write_uint32_t(speed_copy);
-    //uart_write_nl();
   }
 
 }
